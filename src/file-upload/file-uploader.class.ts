@@ -11,6 +11,12 @@ export interface Headers {
   value:string;
 }
 
+export enum TransportType {
+  xhr,
+  iframe,
+  custom
+}
+
 export type ParsedResponseHeaders = {[headerFieldName:string]:string};
 
 export type FilterFunction = {name:string, fn:(item?:FileLikeObject, options?:FileUploaderOptions)=>boolean};
@@ -19,7 +25,7 @@ export interface FileUploaderOptions {
   allowedMimeType?:Array<string>;
   allowedFileType?:Array<string>;
   autoUpload?:boolean;
-  isHTML5?:boolean;
+  transportType?: TransportType;
   filters?:Array<FilterFunction>;
   headers?:Array<Headers>;
   method?:string;
@@ -46,7 +52,7 @@ export class FileUploader {
 
   public options:FileUploaderOptions = {
     autoUpload: false,
-    isHTML5: true,
+    transportType: TransportType.xhr,
     filters: [],
     removeAfterUpload: false,
     disableMultipart: false
@@ -138,7 +144,18 @@ export class FileUploader {
   public uploadItem(value:FileItem):void {
     let index = this.getIndexOfItem(value);
     let item = this.queue[index];
-    let transport = this.options.isHTML5 ? '_xhrTransport' : '_iframeTransport';
+    let transport = '';
+    switch (this.options.transportType) {
+      case TransportType.xhr:
+        transport = '_xhrTransport';
+        break;
+      case TransportType.iframe:
+        transport = '_iframeTransport';
+        break;
+      case TransportType.custom:
+        transport = '_customTransport';
+        break;
+    };
     item._prepareToUploading();
     if (this.isUploading) {
       return;
@@ -150,7 +167,18 @@ export class FileUploader {
   public cancelItem(value:FileItem):void {
     let index = this.getIndexOfItem(value);
     let item = this.queue[index];
-    let prop = this.options.isHTML5 ? item._xhr : item._form;
+    let prop;
+    switch (this.options.transportType) {
+      case TransportType.xhr:
+        prop = item._xhr;
+        break;
+      case TransportType.iframe:
+        prop = item._form;
+        break;
+      case TransportType.custom:
+        prop = {};
+        break;
+    };
     if (item && item.isUploading) {
       prop.abort();
     }
@@ -262,12 +290,12 @@ export class FileUploader {
     this.options.allowedFileType.indexOf(FileType.getMimeClass(item)) === -1);
   }
 
-  public _onErrorItem(item:FileItem, response:string, status:number, headers:ParsedResponseHeaders):void {
+  public _onErrorItem(item:FileItem, response:any, status:number, headers:ParsedResponseHeaders):void {
     item._onError(response, status, headers);
     this.onErrorItem(item, response, status, headers);
   }
 
-  public _onCompleteItem(item:FileItem, response:string, status:number, headers:ParsedResponseHeaders):void {
+  public _onCompleteItem(item:FileItem, response: any, status:number, headers:ParsedResponseHeaders):void {
     item._onComplete(response, status, headers);
     this.onCompleteItem(item, response, status, headers);
     let nextItem = this.getReadyItems()[0];
@@ -359,6 +387,10 @@ export class FileUploader {
     }
     xhr.send(sendable);
     this._render();
+  }
+
+  protected _customTransport(item:FileItem):any {
+    this['customTransport'](this, item);
   }
 
   protected _getTotalProgress(value:number = 0):number {
@@ -458,7 +490,7 @@ export class FileUploader {
     this.onAfterAddingAll(items);
   }
 
-  protected _onBeforeUploadItem(item:FileItem):void {
+  public _onBeforeUploadItem(item:FileItem):void {
     item._onBeforeUpload();
     this.onBeforeUploadItem(item);
   }
@@ -468,7 +500,7 @@ export class FileUploader {
     this.onBuildItemForm(item, form);
   }
 
-  protected _onProgressItem(item:FileItem, progress:any):void {
+  public _onProgressItem(item:FileItem, progress:any):void {
     let total = this._getTotalProgress(progress);
     this.progress = total;
     item._onProgress(progress);
@@ -478,13 +510,13 @@ export class FileUploader {
   }
 
   /* tslint:disable */
-  protected _onSuccessItem(item:FileItem, response:string, status:number, headers:ParsedResponseHeaders):void {
+  public _onSuccessItem(item:FileItem, response:string, status:number, headers:ParsedResponseHeaders):void {
     item._onSuccess(response, status, headers);
     this.onSuccessItem(item, response, status, headers);
   }
 
   /* tslint:enable */
-  protected _onCancelItem(item:FileItem, response:string, status:number, headers:ParsedResponseHeaders):void {
+  public _onCancelItem(item:FileItem, response:string, status:number, headers:ParsedResponseHeaders):void {
     item._onCancel(response, status, headers);
     this.onCancelItem(item, response, status, headers);
   }
