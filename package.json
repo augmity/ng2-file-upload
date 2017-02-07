@@ -1,7 +1,7 @@
 {
   "name": "agm-file-upload-base",
   "version": "1.2.0",
-  "private": true,
+  "private": false,
   "description": "Fork of https://github.com/valor-software/ng2-file-upload",
   "scripts": {
     "lite-server": "lite-server -c demo/bs-config.json",
